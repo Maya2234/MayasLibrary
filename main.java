@@ -30,29 +30,29 @@ class HelloWorld {
 
             switch (choice) {
                 case 1:
-                    System.out.println("You have chosen to browse books.");
+                    //System.out.println("You have chosen to browse books.");
                     browseBooks(conn);
 
                     break;
                 case 2:
-                    System.out.println("You have chosen to checkout books.");
+                    //System.out.println("You have chosen to checkout books.");
                     checkoutBooks(conn, scanner,userId);
 
                     break;
                 case 3:
-                    System.out.println("You have chosen to return books.");
                     returnBooks(conn, scanner, userId);
                     break;
+
                 case 4:
-                    System.out.println("You have chosen to register for a library card.");
-                    // For example: you might call a method like registerCard();
+                    Register(conn, scanner);
                     break;
                 
                 case 5:
+                    System.out.println("Come back soon. Goodbye!");
+ 
                     break;
                 default:
-                    // This block is executed if the user's input doesn't match any of the cases
-                    System.out.println("That is not a valid option. Please choose a number from 1 to 4.");
+                    System.out.println("That is not a valid option. Please choose an option from the menu.");
                     break;
             }
 
@@ -97,39 +97,43 @@ class HelloWorld {
         System.out.print(prompt);
         while (!scanner.hasNextInt()) {
             System.out.println("Invalid input. Please enter a whole number.");
-            scanner.next(); // Consume the invalid input
+            scanner.next(); 
             System.out.print(prompt);
         }
         return scanner.nextInt();
     }
 
     public static void checkoutBooks(Connection conn, Scanner scanner, int userid) {
-        
-        while(userid==-1)
-            userid = login(conn, scanner);
-        
-        ArrayList<Integer> bookIdsToCheckout = new ArrayList<>();
-        int bookId;
+    while (userid == -1)
+        userid = login(conn, scanner);
 
-        System.out.println("\n--- Checkout Books ---");
-        System.out.println("Enter the Book ID of each book you want to checkout.");
+    ArrayList<Integer> bookIdsToCheckout = new ArrayList<>();
+    int bookId;
 
-        do {
-            bookId = getUserIntInput(scanner, "Enter a Book ID or 0 to exit: ");
+    System.out.println("\n--- Checkout Books ---");
+    System.out.println("Enter the Book ID of each book you want to checkout.");
 
-            if (bookId != 0) {
+    do {
+        bookId = getUserIntInput(scanner, "Enter a Book ID or 0 to exit: ");
+
+        if (bookId != 0) {
+            if (bookExists(conn, bookId)) {
                 bookIdsToCheckout.add(bookId);
                 System.out.println("Book ID " + bookId + " added to your checkout list.");
+            } else {
+                System.out.println("Book ID " + bookId + " does not exist. Please try again.");
             }
-        } while (bookId != 0);
-
-        if (!bookIdsToCheckout.isEmpty()) {
-            System.out.println("Your checkout list: " + bookIdsToCheckout);
-            processCheckout(conn, userid, bookIdsToCheckout);
-        } else {
-            System.out.println("No books were added to the checkout list.");
         }
-    } //close checkout books
+    } while (bookId != 0);
+
+    if (!bookIdsToCheckout.isEmpty()) {
+        System.out.println("Your checkout list: " + bookIdsToCheckout);
+        processCheckout(conn, userid, bookIdsToCheckout);
+    } else {
+        System.out.println("No books were added to the checkout list.");
+    }
+}
+
 
     public static void processCheckout(Connection conn, int userId, ArrayList<Integer> bookIdsToCheckout){
 
@@ -161,7 +165,6 @@ class HelloWorld {
                 throw new SQLException("Creating checkout failed, no rows affected.");
             }
 
-            // Retrieve the auto-generated checkout_id
             try (ResultSet generatedKeys = pstmtCheckout.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     generatedCheckoutId = generatedKeys.getLong(1);
@@ -180,7 +183,7 @@ class HelloWorld {
                 pstmtCheckoutItems.setInt(2, bookId);
                 pstmtCheckoutItems.setInt(3, userId);
 
-                // Add this statement to a batch for efficient insertion
+                // Add statement to batch for efficient insertion
                 pstmtCheckoutItems.addBatch();
             }
 
@@ -190,10 +193,9 @@ class HelloWorld {
             //Check if all items were inserted successfully
             System.out.println("Successfully added " + updateCounts.length + " books to checkout " + generatedCheckoutId);
         }
-
-        // If all statements above ran without an exception, commit the changes to the database.
+        //commit if successful
         conn.commit();
-        System.out.println("Checkout transaction successfully committed for user " + userId);
+        System.out.println("Checkout transaction successful for user " + userId);
         
     } catch (SQLException e) {
         // If failure, roll back
@@ -211,7 +213,6 @@ class HelloWorld {
         e.printStackTrace();
         
     } finally {
-        // Always reset auto-commit back to true in the finally block
         try {
             if (conn != null) {
                 conn.setAutoCommit(true);
@@ -224,7 +225,7 @@ class HelloWorld {
 }
 public static int login(Connection conn, Scanner scanner){
     int userId = 0;
-    System.out.print("Enter your name\n");        
+    System.out.print("Please login. \nEnter your name\n");        
     var name = scanner.next();
      String sql = "SELECT user_id FROM user WHERE name = ?";
 
@@ -239,7 +240,7 @@ public static int login(Connection conn, Scanner scanner){
                     System.out.println("Login successful for user: " + name +"\nuserid: "+ userId);
                 } else {
                     // No matching name found
-                    System.out.println("Login failed: User '" + name + "' not found.");
+                    Register(conn, scanner);
                 }
             }
         } catch (SQLException e) {
@@ -257,37 +258,38 @@ public static void returnBooks(Connection conn, Scanner scanner, int userId){
 
     //search for book id checked out with this user id
 
-    String sql = "SELECT book_id FROM checkout_items WHERE user_id = ?";
+    String sql = "SELECT book_id FROM checkout_items WHERE user_id = ? AND returned = FALSE;";
     try(PreparedStatement pstmt = conn.prepareStatement(sql)){
         pstmt.setLong(1, userId); // Use the new checkout_id
          try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     // If a row is found, display
+                    ArrayList<Integer> bookIdsToReturn = new ArrayList<>();
+                    int bookId;
+
                     while (rs.next()) {
                         int id = rs.getInt("book_id");
                         System.out.printf("ID: %d %n", id);
-
-                        ArrayList<Integer> bookIdsToReturn = new ArrayList<>();
-                        int bookId;
-                        System.out.println("Enter the Book ID of each book you want to return:");
+                    }
 
                         do {
-                            bookId = getUserIntInput(scanner, "Enter a Book ID or 0 to exit: ");
+                            bookId = getUserIntInput(scanner, "Enter the Book ID of a book you want to return and enter (0 to finish): ");
 
                             if (bookId != 0) {
                                 bookIdsToReturn.add(bookId);
-                                System.out.println("Book ID " + bookId + " added to your checkout list.");
+                                System.out.println("Book ID " + bookId + " added to your return.");
                             }
                         } while (bookId != 0);
 
                         if (!bookIdsToReturn.isEmpty()) {
                             System.out.println("Your checkout list: " + bookIdsToReturn);
                             processReturn(conn, scanner, userId, bookIdsToReturn);
-                        } else {
-                            // No matching name found
-                            System.out.println("You have no books checked out to return.");
                         }
-                    }
+   
+                }
+                else{
+                    System.out.println("You have no books checked out to return.");
+
                 }
             } catch (SQLException e) {
             System.err.println("Database error during login: " + e.getMessage());
@@ -299,68 +301,136 @@ public static void returnBooks(Connection conn, Scanner scanner, int userId){
 
 }
 
-public static void processReturn(Connection conn, Scanner scanner, int userId, ArrayList<Integer> bookIdsToReturn){
-     if (bookIdsToReturn == null || bookIdsToReturn.isEmpty()) {
-        System.out.println("No books to checkout.");
-        return;
-        }
+    public static void processReturn(Connection conn, Scanner scanner, int userId, ArrayList<Integer> bookIdsToReturn){
+        if (bookIdsToReturn == null || bookIdsToReturn.isEmpty()) {
+            System.out.println("No books to return.");
+            return;
+            }
 
-        
-        // All changes will be temporary until we call `commit()`.
-        try {
-        conn.setAutoCommit(false);
-        
-        String sqlReturn = "UPDATE checkout_items\n" + 
-                        "SET returned = TRUE\n" + 
-                        "WHERE user_id = ? AND book_id = ?; VALUES (?, ?)";
-        try (PreparedStatement pstmtCheckoutItems = conn.prepareStatement(sqlReturn)) {
             
-            // Loop through the list of book IDs
-            for (int bookId : bookIdsToReturn) {
-                // Set the parameters for each book item                
-                pstmtCheckoutItems.setInt(1, userId);
-                pstmtCheckoutItems.setInt(2, bookId);
-
-                // Add this statement to a batch for efficient insertion
-                pstmtCheckoutItems.addBatch();
-            }
-
-            int[] updateCounts = pstmtCheckoutItems.executeBatch();
+            // All changes will be temporary until we call `commit()`.
+            try {
+            conn.setAutoCommit(false);
             
-            //Check if all items were inserted successfully
-            System.out.println("Successfully returned " + updateCounts.length + " books");
-        }
+            String sqlReturn = "UPDATE checkout_items\n" + 
+                            "SET returned = TRUE\n" + 
+                            "WHERE user_id = ? AND book_id = ?;";
+            try (PreparedStatement pstmtCheckoutItems = conn.prepareStatement(sqlReturn)) {
+                
+                // Loop through the list of book IDs
+                for (int bookId : bookIdsToReturn) {
+                    // Set the parameters for each book item                
+                    pstmtCheckoutItems.setInt(1, userId);
+                    pstmtCheckoutItems.setInt(2, bookId);
 
-        // If all statements above ran without an exception, commit the changes to the database.
-        conn.commit();
-        System.out.println("Return transaction successfully committed for user " + userId);
-        
-    } catch (SQLException e) {
-        // If failure, roll back
-        try {
-            if (conn != null) {
-                System.err.println("Transaction is being rolled back due to an error.");
-                conn.rollback();
+                    // Add this statement to a batch for efficient insertion
+                    pstmtCheckoutItems.addBatch();
+                }
+
+                int[] updateCounts = pstmtCheckoutItems.executeBatch();
+                
+                //Check if all items were inserted successfully
+                System.out.println("Successfully returned " + updateCounts.length + " books");
             }
-        } catch (SQLException ex) {
-            System.err.println("Failed to rollback transaction: " + ex.getMessage());
-            ex.printStackTrace();
-        }
-        
-        System.err.println("Checkout failed: " + e.getMessage());
-        e.printStackTrace();
-        
-    } finally {
-        // Always reset auto-commit back to true in the finally block
-        try {
-            if (conn != null) {
-                conn.setAutoCommit(true);
-            }
+
+            // If all statements above ran without an exception, commit the changes to the database.
+            conn.commit();
+            System.out.println("Return transaction successful for user " + userId);
+            
         } catch (SQLException e) {
-            System.err.println("Failed to reset auto-commit: " + e.getMessage());
+            // In case of error, discard
+            try {
+                if (conn != null) {
+                    System.err.println("Transaction is being rolled back due to an error.");
+                    conn.rollback();
+                }
+            } catch (SQLException ex) {
+                System.err.println("Failed to rollback transaction: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+            
+            System.err.println("Checkout failed: " + e.getMessage());
             e.printStackTrace();
+            
+        } finally {
+            // Always reset auto-commit back to true in the finally block
+            try {
+                if (conn != null) {
+                    conn.setAutoCommit(true);
+                }
+            } catch (SQLException e) {
+                System.err.println("Failed to reset auto-commit: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
-}
+
+    public static void Register(Connection conn, Scanner scanner){
+
+        try {
+            // Prompt user for input
+            System.out.println("Register for a library card: ");
+            scanner.nextLine();
+
+            System.out.println("Enter name: ");
+            String name = scanner.nextLine();
+
+            System.out.print("Enter password: ");
+            String password = scanner.nextLine();
+
+            System.out.print("Enter email: ");
+            String email = scanner.nextLine();
+
+            System.out.print("Enter street: ");
+            String street = scanner.nextLine();
+
+            System.out.print("Enter state (st): ");
+            String st = scanner.nextLine();
+
+            System.out.print("Enter zip code: ");
+            String zip = scanner.nextLine();
+
+            System.out.print("Enter city: ");
+            String city = scanner.nextLine();
+
+            // SQL Insert statement
+            String sql = "INSERT INTO user (name, password, email, street, st, zip, city) " +
+                         "VALUES ( ?, ?, ?, ?, ?, ?, ?)";
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, name);
+                pstmt.setString(2, password);
+                pstmt.setString(3, email);
+                pstmt.setString(4, street);
+                pstmt.setString(5, st);
+                pstmt.setString(6, zip);
+                pstmt.setString(7, city);
+
+                int rowsInserted = pstmt.executeUpdate();
+                if (rowsInserted > 0) {
+                    System.out.println("User registered successfully.");
+                } else {
+                    System.out.println("Failed to register user.");
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. User ID must be an integer.");
+        } 
+    }
+    public static boolean bookExists(Connection conn, int bookId) {
+        String sql = "SELECT 1 FROM book WHERE book_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, bookId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next();  // true if book exists
+            }
+        } catch (SQLException e) {
+            System.out.println("Error checking book existence: " + e.getMessage());
+            return false;
+        }
+    }
 
 } //closing library class
