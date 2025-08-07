@@ -254,24 +254,21 @@ public static void returnBooks(Connection conn, Scanner scanner, int userId){
      while(userId==-1)
             userId = login(conn, scanner);
 
-    System.out.println("The books you have checked out are:");
-
     //search for book id checked out with this user id
-
     String sql = "SELECT book_id FROM checkout_items WHERE user_id = ? AND returned = FALSE;";
     try(PreparedStatement pstmt = conn.prepareStatement(sql)){
         pstmt.setLong(1, userId); // Use the new checkout_id
          try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
+                if (rs.isBeforeFirst()) {
                     // If a row is found, display
+                    System.out.println("The books you have checked out are:");
+
                     ArrayList<Integer> bookIdsToReturn = new ArrayList<>();
                     int bookId;
-
                     while (rs.next()) {
                         int id = rs.getInt("book_id");
                         System.out.printf("ID: %d %n", id);
                     }
-
                         do {
                             bookId = getUserIntInput(scanner, "Enter the Book ID of a book you want to return and enter (0 to finish): ");
 
@@ -279,17 +276,11 @@ public static void returnBooks(Connection conn, Scanner scanner, int userId){
                                 bookIdsToReturn.add(bookId);
                                 System.out.println("Book ID " + bookId + " added to your return.");
                             }
-                        } while (bookId != 0);
-
-                        if (!bookIdsToReturn.isEmpty()) {
-                            System.out.println("Your checkout list: " + bookIdsToReturn);
-                            processReturn(conn, scanner, userId, bookIdsToReturn);
-                        }
-   
+                        } while (bookId != 0);       
+                        processReturn(conn, scanner, userId, bookIdsToReturn);         
                 }
                 else{
                     System.out.println("You have no books checked out to return.");
-
                 }
             } catch (SQLException e) {
             System.err.println("Database error during login: " + e.getMessage());
