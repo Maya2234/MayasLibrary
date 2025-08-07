@@ -15,51 +15,76 @@ class HelloWorld {
 
     public static void main(String[] args) {
         try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+            System.out.println("Welcome to Mayas library!\nPlease enter:\n1) to login as staff\n2) For users\n5) to leave library"); 
+            int choice = -1;        
+            Scanner scanner = new Scanner(System.in);
+
+            while(choice != 5){
+
+                choice = scanner.nextInt();
+                int userId = -1;  
+                switch (choice) {
+                        case 1:
+
+                            //staff
+                            if (staffLogin(conn, scanner)){
+
+                                while(choice!=5){                               
+                                System.out.println("\nEnter:\n1) to view all staff\n2) to add a book to the library\n5) to exit");
+                                choice = scanner.nextInt();
+                                switch (choice) {
+                                    case 1:
+                                        browseStaff(conn);
+                                        break;
+                                
+                                    case 2:
+                                        insertBook(conn,scanner);
+                                    default:
+                                        //System.out.println("Come back soon, goodbye!");
+                                        break;
+                                }
+                            }
+                        }
+                            break;
+
+                        case 2:
+                            //user
+                            while(choice != 5){
+                                System.out.print("\n1. Browse books\n2. Checkout books\n3. Return books\n4. Register for a library card\n5. Leave library\n"); 
+                                
+                                choice = scanner.nextInt();
+
+                                switch (choice) {
+                                    case 1:
+                                        browseBooks(conn);
+
+                                        break;
+                                    case 2:
+                                        checkoutBooks(conn, scanner,userId);
+
+                                        break;
+                                    case 3:
+                                        returnBooks(conn, scanner, userId);
+                                        break;
+
+                                    case 4:
+                                        Register(conn, scanner);
+                                        break;
+                                    
+                                    case 5:
+                                        System.out.println("Come back soon. Goodbye!");
+                    
+                                        break;
+                                    default:
+                                        System.out.println("That is not a valid option. Please choose an option from the menu.");
+                                        break;
+                                }//end switch        
+                        } //closing library menu
+                        //break;  
+
+            }//end role switch                
+            }//close role menu
             
-            System.out.println("Successfully connected to the database!");   
-        System.out.println("Welcome to Mayas library!\n"); 
-
-        int choice = -1;        
-        int userId = -1;     
-        Scanner scanner = new Scanner(System.in);
-
-        while(choice != 5){
-            System.out.print("\n1. Browse books\n2. Checkout books\n3. Return books\n4. Register for a library card\n5. Leave library\n"); 
-            
-            choice = scanner.nextInt();
-
-            switch (choice) {
-                case 1:
-                    //System.out.println("You have chosen to browse books.");
-                    browseBooks(conn);
-
-                    break;
-                case 2:
-                    //System.out.println("You have chosen to checkout books.");
-                    checkoutBooks(conn, scanner,userId);
-
-                    break;
-                case 3:
-                    returnBooks(conn, scanner, userId);
-                    break;
-
-                case 4:
-                    Register(conn, scanner);
-                    break;
-                
-                case 5:
-                    System.out.println("Come back soon. Goodbye!");
- 
-                    break;
-                default:
-                    System.out.println("That is not a valid option. Please choose an option from the menu.");
-                    break;
-            }
-
-            
-
-        } //closing library menu
-        scanner.close();
         } catch (SQLException e) {
             // Handle any SQL exceptions that occur during connection or method calls
             System.err.println("Database connection error: " + e.getMessage());
@@ -93,6 +118,55 @@ class HelloWorld {
 
     } //close browse books
 
+    public static void browseStaff(Connection conn) {
+        try (Statement stmt = conn.createStatement();
+         ResultSet rs = stmt.executeQuery("SELECT employee_id, name, role FROM staff")) {
+
+        System.out.println("\n--- All staff in the Library ---");
+
+        if (!rs.isBeforeFirst()) {
+            System.out.println("No staff found in the library.");
+            return;
+        }
+
+        while (rs.next()) {
+            int id = rs.getInt("employee_id");
+            String name = rs.getString("name");
+            String role = rs.getString("role");
+            System.out.printf("ID: %d, name: %s, role: %s%n", id, name, role);
+        }
+
+        } catch (SQLException e) {
+            System.err.println("Error find staff: " + e.getMessage());
+            e.printStackTrace();
+        } //close catch
+
+    } //close browse staff
+
+     public static void insertBook(Connection conn, Scanner scanner) {
+        scanner.nextLine();
+        System.out.print("Enter the book title:\t");
+        String title = scanner.nextLine();
+        System.out.print("\nEnter the book author:\t");
+        String author = scanner.nextLine();
+
+        String sql = "INSERT INTO book (title, author) VALUES (?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, title);
+            pstmt.setString(2, author);
+
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("\nBook added successfully.");
+            } else {
+                System.out.println("\nFailed to add book.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error inserting book: " + e.getMessage());
+        }
+    }
      private static int getUserIntInput(Scanner scanner, String prompt) {
         System.out.print(prompt);
         while (!scanner.hasNextInt()) {
@@ -102,6 +176,8 @@ class HelloWorld {
         }
         return scanner.nextInt();
     }
+
+    
 
     public static void checkoutBooks(Connection conn, Scanner scanner, int userid) {
     while (userid == -1)
@@ -248,6 +324,33 @@ public static int login(Connection conn, Scanner scanner){
             e.printStackTrace();
         }
         return userId;
+}
+public static boolean staffLogin(Connection conn, Scanner scanner){
+    int userId = 0;
+    System.out.print("Please login for staff priviledges. \nEnter your name\n");        
+    var name = scanner.next();
+     String sql = "SELECT employee_id FROM staff WHERE name = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, name);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+
+                    // If a row is found, get the user_id
+                    userId = rs.getInt("employee_id");
+                    System.out.println("Login successful for staff: " + name +"\nemployee_id: "+ userId);
+                    return true;
+                } else {
+                    // No matching name found
+                    return false;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Database error during login: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
 }
 
 public static void returnBooks(Connection conn, Scanner scanner, int userId){
